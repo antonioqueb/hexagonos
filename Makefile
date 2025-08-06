@@ -23,12 +23,20 @@ help: ## Mostrar ayuda
 setup: ## Configuración inicial completa
 	@echo "$(GREEN)🔥 Configurando Hexagonos...$(NC)"
 	@chmod +x setup.sh
+	@if [[ "$OSTYPE" == "darwin"* ]]; then \
+		echo "$(YELLOW)Detectado macOS - usando configuración sin sudo$(NC)"; \
+	fi
 	@./setup.sh
 
 setup-clean: ## Configuración inicial limpia (elimina datos existentes)
 	@echo "$(YELLOW)⚠️  Configuración limpia (eliminará datos existentes)...$(NC)"
 	@chmod +x setup.sh
 	@./setup.sh --clean
+
+setup-macos-clean: ## Configuración inicial limpia para macOS
+	@echo "$(YELLOW)🍎 Configuración limpia para macOS (eliminará datos existentes)...$(NC)"
+	@chmod +x setup-macos.sh
+	@./setup-macos.sh --clean
 
 up: ## Iniciar todos los servicios
 	@echo "$(GREEN)🚀 Iniciando servicios de Hexagonos...$(NC)"
@@ -136,6 +144,18 @@ info: ## Mostrar información del sistema
 	@echo "🌐 Red:"
 	@docker network ls | grep hexagonos
 
-dev-mode: ## Iniciar en modo desarrollo
-	@echo "$(YELLOW)🔧 Iniciando en modo desarrollo...$(NC)"
-	@docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+open-odoo: ## Abrir Odoo en el navegador (macOS)
+	@if [[ "$OSTYPE" == "darwin"* ]]; then \
+		echo "$(GREEN)🍎 Abriendo Odoo en el navegador...$(NC)"; \
+		open http://localhost:8069; \
+	else \
+		echo "$(YELLOW)Este comando es específico para macOS$(NC)"; \
+	fi
+
+open-pgadmin: ## Abrir PgAdmin en el navegador (macOS)
+	@if [[ "$OSTYPE" == "darwin"* ]]; then \
+		echo "$(GREEN)🍎 Abriendo PgAdmin en el navegador...$(NC)"; \
+		open http://localhost:5050; \
+	else \
+		echo "$(YELLOW)Este comando es específico para macOS$(NC)"; \
+	fi

@@ -1,12 +1,12 @@
 #!/bin/bash
 
 # =============================================================================
-# HEXAGONOS - Script de Configuración e Instalación
+# HEXAGONOS - Script de Configuración para macOS (Sin sudo)
 # =============================================================================
 
 set -e
 
-echo "🔥 Iniciando configuración de Hexagonos Odoo 18..."
+echo "🔥 Iniciando configuración de Hexagonos Odoo 18 para macOS..."
 
 # Colores para output
 RED='\033[0;31m'
@@ -32,15 +32,28 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Verificar si Docker está instalado
-if ! command -v docker &> /dev/null; then
-    print_error "Docker no está instalado. Por favor instala Docker primero."
+# Verificar que estamos en macOS
+if [[ "$OSTYPE" != "darwin"* ]]; then
+    print_error "Este script está diseñado para macOS. Usa setup.sh para Linux."
     exit 1
 fi
 
-# Verificar si Docker Compose está instalado
+# Verificar si Docker está instalado
+if ! command -v docker &> /dev/null; then
+    print_error "Docker no está instalado. Por favor instala Docker Desktop para Mac primero."
+    print_message "Puedes descargarlo desde: https://docs.docker.com/desktop/mac/install/"
+    exit 1
+fi
+
+# Verificar si Docker Compose está instalado (viene con Docker Desktop)
 if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    print_error "Docker Compose no está instalado. Por favor instala Docker Compose primero."
+    print_error "Docker Compose no está disponible. Asegúrate de que Docker Desktop esté corriendo."
+    exit 1
+fi
+
+# Verificar que Docker Desktop esté corriendo
+if ! docker info &> /dev/null; then
+    print_error "Docker Desktop no está corriendo. Por favor inicia Docker Desktop."
     exit 1
 fi
 
@@ -72,21 +85,11 @@ if [ ! -f config/servers.json ]; then
     print_warning "config/servers.json no encontrado. Por favor créalo usando la plantilla proporcionada."
 fi
 
-# Configurar permisos (ajustado para macOS)
-print_message "Configurando permisos de directorios..."
-if [[ "$OSTYPE" == "darwin"* ]]; then
-    # macOS
-    chmod -R 755 addons/
-    chmod -R 755 logs/
-    print_success "Permisos configurados para macOS"
-else
-    # Linux
-    sudo chown -R 101:101 addons/
-    sudo chown -R 101:101 logs/
-    chmod -R 755 addons/
-    chmod -R 755 logs/
-    print_success "Permisos configurados para Linux"
-fi
+# Configurar permisos (macOS - sin sudo)
+print_message "Configurando permisos de directorios para macOS..."
+chmod -R 755 addons/ 2>/dev/null || true
+chmod -R 755 logs/ 2>/dev/null || true
+print_success "Permisos configurados para macOS"
 
 # Detener contenedores existentes si están corriendo
 print_message "Deteniendo contenedores existentes..."
@@ -104,25 +107,50 @@ docker-compose up -d
 
 # Esperar a que los servicios estén listos
 print_message "Esperando a que los servicios estén listos..."
-sleep 10
+sleep 15
 
 # Verificar estado de los servicios
 print_message "Verificando estado de los servicios..."
 
 # Verificar PostgreSQL
-if docker-compose exec -T hexagonos-db pg_isready -U $POSTGRES_USER -d $POSTGRES_DB; then
-    print_success "PostgreSQL está funcionando correctamente"
-else
-    print_error "PostgreSQL no está funcionando"
-    exit 1
-fi
+print_message "Verificando PostgreSQL..."
+max_attempts=30
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    if docker-compose exec -T hexagonos-db pg_isready -U $POSTGRES_USER -d postgres > /dev/null 2>&1; then
+        print_success "PostgreSQL está funcionando correctamente"
+        break
+    fi
+    
+    if [ $attempt -eq $max_attempts ]; then
+        print_error "PostgreSQL no está funcionando después de $max_attempts intentos"
+        print_message "Ejecuta 'docker-compose logs hexagonos-db' para ver los logs"
+    else
+        echo -n "."
+        sleep 2
+        attempt=$((attempt + 1))
+    fi
+done
 
 # Verificar Odoo
-if curl -s http://localhost:$ODOO_PORT/web/health > /dev/null; then
-    print_success "Odoo está funcionando correctamente"
-else
-    print_warning "Odoo puede estar iniciando aún. Verificar en unos minutos."
-fi
+print_message "Verificando Odoo..."
+max_attempts=60  # Odoo puede tardar más en iniciar
+attempt=1
+while [ $attempt -le $max_attempts ]; do
+    if curl -s -f http://localhost:$ODOO_PORT/web/database/selector > /dev/null 2>&1; then
+        print_success "Odoo está funcionando correctamente"
+        break
+    fi
+    
+    if [ $attempt -eq $max_attempts ]; then
+        print_warning "Odoo puede estar iniciando aún. Verificar en unos minutos."
+        print_message "Ejecuta 'docker-compose logs hexagonos-odoo' para ver los logs"
+    else
+        echo -n "."
+        sleep 3
+        attempt=$((attempt + 1))
+    fi
+done
 
 # Mostrar información de acceso
 echo ""
@@ -137,7 +165,7 @@ echo ""
 echo "🔐 Credenciales:"
 echo "• Odoo Master Password: $ODOO_MASTER_PASSWORD"
 echo "• PgAdmin Email: $PGADMIN_EMAIL"
-echo "• PgAdmin Password: $PGADMIN_PASSWORD"
+echo "• PgAdmin Password: $PGLADMIN_PASSWORD"
 echo "• PostgreSQL User: $POSTGRES_USER"
 echo "• PostgreSQL Password: $POSTGRES_PASSWORD"
 echo ""
@@ -153,4 +181,18 @@ echo "• Detener: docker-compose down"
 echo "• Ver logs: docker-compose logs -f"
 echo "• Reiniciar: docker-compose restart"
 echo ""
-print_success "¡Configuración completada! Hexagonos está listo para usar."
+echo "🍎 Comandos específicos para macOS:"
+echo "• Setup: ./setup-macos.sh"
+echo "• Ver status: docker-compose ps"
+echo "• Abrir Odoo: open http://localhost:$ODOO_PORT"
+echo "• Abrir PgAdmin: open http://localhost:$PGADMIN_PORT"
+echo ""
+print_success "¡Configuración completada! Hexagonos está listo para usar en macOS."
+
+# Opcional: Abrir navegador automáticamente
+read -p "¿Deseas abrir Odoo en el navegador ahora? (y/n): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    sleep 3
+    open http://localhost:$ODOO_PORT
+fi
