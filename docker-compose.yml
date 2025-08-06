@@ -1,0 +1,70 @@
+version: '3.8'
+
+services:
+  hexagonos-db:
+    image: postgres:15
+    container_name: hexagonos-postgres
+    environment:
+      - POSTGRES_DB=${POSTGRES_DB}
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - hexagonos-db-data:/var/lib/postgresql/data
+    networks:
+      - hexagonos-network
+    restart: unless-stopped
+    ports:
+      - "${POSTGRES_PORT}:5432"
+
+  hexagonos-odoo:
+    image: odoo:18.0
+    container_name: hexagonos-odoo
+    depends_on:
+      - hexagonos-db
+    environment:
+      - HOST=${POSTGRES_HOST}
+      - USER=${POSTGRES_USER}
+      - PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - hexagonos-odoo-web-data:/var/lib/odoo
+      - ./config/odoo.conf:/etc/odoo/odoo.conf:ro
+      - ./addons:/mnt/extra-addons
+      - ./logs:/var/log/odoo
+    networks:
+      - hexagonos-network
+    ports:
+      - "${ODOO_PORT}:8069"
+    restart: unless-stopped
+    command: ["odoo", "-c", "/etc/odoo/odoo.conf"]
+
+  hexagonos-pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: hexagonos-pgadmin
+    depends_on:
+      - hexagonos-db
+    environment:
+      - PGADMIN_DEFAULT_EMAIL=${PGADMIN_EMAIL}
+      - PGADMIN_DEFAULT_PASSWORD=${PGADMIN_PASSWORD}
+      - PGADMIN_CONFIG_SERVER_MODE=False
+      - PGADMIN_CONFIG_MASTER_PASSWORD_REQUIRED=False
+    volumes:
+      - hexagonos-pgadmin-data:/var/lib/pgadmin
+      - ./config/servers.json:/pgadmin4/servers.json:ro
+    networks:
+      - hexagonos-network
+    ports:
+      - "${PGADMIN_PORT}:80"
+    restart: unless-stopped
+
+volumes:
+  hexagonos-db-data:
+    name: hexagonos-db-data
+  hexagonos-odoo-web-data:
+    name: hexagonos-odoo-web-data
+  hexagonos-pgadmin-data:
+    name: hexagonos-pgadmin-data
+
+networks:
+  hexagonos-network:
+    name: hexagonos-network
+    driver: bridge
