@@ -8,7 +8,7 @@ services:
       # - "1400:8069"  # COMENTADO - Todo va por nginx ahora
       - "8072:8072"  # Puerto para WebSocket/longpolling
     volumes:
-      - odoo-web-data:/var/lib/odoo
+      - hexagonos-services-odoo-web-data:/var/lib/odoo
       - ./config:/etc/odoo
       - ./addons:/mnt/extra-addons
       - ./logs:/var/log/odoo
@@ -17,9 +17,7 @@ services:
       - USER=${ODOO_DB_USER}
       - PASSWORD=${ODOO_DB_PASSWORD}
       - ODOO_MASTER_PASSWD=${ODOO_ADMIN_PASSWD}
-    # Usar solo el archivo de configuración para evitar inconsistencias
     command: odoo --config=/etc/odoo/odoo.conf
-    # Configuración optimizada para producción
     deploy:
       resources:
         limits:
@@ -48,7 +46,7 @@ services:
       - POSTGRES_USER=${POSTGRES_USER}
       - PGDATA=/var/lib/postgresql/data/pgdata
     volumes:
-      - odoo-db-data:/var/lib/postgresql/data/pgdata
+      - hexagonos-services-odoo-db-data:/var/lib/postgresql/data/pgdata
       - ./backups:/backups
     restart: unless-stopped
     networks:
@@ -70,14 +68,13 @@ services:
     ports:
       - "5050:80"
     volumes:
-      - pgadmin-data:/var/lib/pgadmin
+      - hexagonos-services-pgadmin-data:/var/lib/pgadmin
     depends_on:
       - db
     restart: unless-stopped
     networks:
       - odoo-network
 
-  # Nginx para producción - HABILITADO
   nginx:
     image: nginx:alpine
     container_name: nginx_odoo18
@@ -94,9 +91,9 @@ services:
       - odoo-network
 
 volumes:
-  odoo-web-data:
-  odoo-db-data:
-  pgadmin-data:
+  hexagonos-services-odoo-web-data:
+  hexagonos-services-odoo-db-data:
+  hexagonos-services-pgadmin-data:
 
 networks:
   odoo-network:
